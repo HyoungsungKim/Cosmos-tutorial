@@ -1,7 +1,7 @@
 package nameservice
 
 import (
-	"github.com/cosmos/sdk-application-tutiroal/x/nameservice/types"
+	"github.com/cosmos/sdk-application-tutorial/x/nameservice/types"
 )
 
 const (
