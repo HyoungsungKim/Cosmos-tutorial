@@ -42,7 +42,7 @@ func resolveNameHandler(cliCtx contect.CLIContext, storeName string) http.Handle
 }
 
 func whoIsHandler(cliCtx context.CLIContext, storeName string) http.HandlerFunc {
-	return func(w http.ResponseWriterm r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(v)
 		paramType := vars[restName]
 
@@ -60,7 +60,7 @@ func namesHandler(cliCtx context.CLIContext, storeName string) http.HandlerFunc 
 	return func(w http.ResponseWriter, r *http.Request) {
 		res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/names", storeName), nil)
 		if err != nil {
-			rest.WriteErrorResponse*w, http.StatusNotFound, err.Error())
+			rest.WriteErrorResponse(w, http.StatusNotFound, err.Error())
 			return
 		}
 	}
