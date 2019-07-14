@@ -7,9 +7,9 @@ import (
 )
 
 type Keeper struct {
-	coinKeepr bank.Keeper
-	storeKey  sdk.StoreKey
-	cdc       *codec.Codec
+	coinKeeper bank.Keeper
+	storeKey   sdk.StoreKey
+	cdc        *codec.Codec
 }
 
 func (k Keeper) SetWhois(ctx sdk.Context, name string, whois Whois) {
@@ -26,13 +26,13 @@ func (k Keeper) GetWhois(ctx sdk.Context, name string) Whois {
 		return NewWhois()
 	}
 	bz := store.Get([]byte(name))
-	var whois whois
+	var whois Whois
 	k.cdc.MustUnmarshalBinaryBare(bz, &whois)
 	return whois
 }
 
 func (k Keeper) ResolveName(ctx sdk.Context, name string) string {
-	return k.GetWhois(ctx, name).value
+	return k.GetWhois(ctx, name).Value
 }
 
 func (k Keeper) SetName(ctx sdk.Context, name string, value string) {
@@ -49,25 +49,25 @@ func (k Keeper) GetOwner(ctx sdk.Context, name string) sdk.AccAddress {
 	return k.GetWhois(ctx, name).Owner
 }
 
-func (k Keeper) SetOwner(ctx sdk.Context, name string, owner sdkAccAddress) {
+func (k Keeper) SetOwner(ctx sdk.Context, name string, owner sdk.AccAddress) {
 	whois := k.GetWhois(ctx, name)
 	whois.Owner = owner
 	k.SetWhois(ctx, name, whois)
 }
 
 func (k Keeper) GetPrice(ctx sdk.Context, name string) sdk.Coins {
-	return k.GetWhois(ctx, name).price
+	return k.GetWhois(ctx, name).Price
 }
 
-func (k Keeper) SetPrice(ctx sdk.Context, name string) sdk.Coins {
+func (k Keeper) SetPrice(ctx sdk.Context, name string, price sdk.Coins) {
 	whois := k.GetWhois(ctx, name)
 	whois.Price = price
-	k.GetWhois(ctx, name, whois)
+	k.SetWhois(ctx, name, whois)
 }
 
 func (k Keeper) GetNamesIterator(ctx sdk.Context) sdk.Iterator {
 	store := ctx.KVStore(k.storeKey)
-	return sdk.KVStorePrefixIterator(store, []bytes{})
+	return sdk.KVStorePrefixIterator(store, []byte{})
 }
 
 func NewKeeper(coinKeeper bank.Keeper, storeKey sdk.StoreKey, cdc *codec.Codec) Keeper {

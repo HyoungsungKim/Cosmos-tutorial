@@ -12,13 +12,13 @@ import (
 	"github.com/hyoungsungkim/nameservice/x/nameservice/types"
 )
 
-func GetTXCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
+func GetTxCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
 	nameserviceTxCmd := &cobra.Command{
 		Use:                        types.ModuleName,
 		Short:                      "Nameservice transaction subcommands",
 		DisableFlagParsing:         true,
 		SuggestionsMinimumDistance: 2,
-		RunE: client.ValidateCmd,
+		RunE:                       client.ValidateCmd,
 	}
 
 	nameserviceTxCmd.AddCommand(client.PostCommands(
@@ -42,7 +42,7 @@ func GetCmdBuyName(cdc *codec.Codec) *cobra.Command {
 				return err
 			}
 
-			coins, err := sdk.parseCoins(args[1])
+			coins, err := sdk.ParseCoins(args[1])
 			if err != nil {
 				return err
 			}
@@ -55,7 +55,7 @@ func GetCmdBuyName(cdc *codec.Codec) *cobra.Command {
 
 			cliCtx.PrintResponse = true
 
-			return utils.GenerateOrBroadcastmsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
 		},
 	}
 }
@@ -80,9 +80,9 @@ func GetCmdSetName(cdc *codec.Codec) *cobra.Command {
 				return err
 			}
 
-			cliCtx.PrintResponse = ture
+			cliCtx.PrintResponse = true
 
-			return utils.GenerateOrBroadcastMsgs(cliCtc, txBldr, []sdk.Msg{msg})
+			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
 		},
 	}
 }

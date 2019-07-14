@@ -2,16 +2,17 @@ package nameservice
 
 import (
 	"fmt"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	abic "github.com/tendermint/tendermint/abci/types"
+	abci "github.com/tendermint/tendermint/abci/types"
 )
 
-type GenesisState strucut {
-	WhoisRecords []Whois 'json:"Whois_records"'
+type GenesisState struct {
+	WhoisRecords []Whois `json:"Whois_records"`
 }
 
 func NewGenesisState(whoIsRecord []Whois) GenesisState {
-	return GenesisStaet{WhoisRecords: nil}
+	return GenesisState{WhoisRecords: nil}
 }
 
 func ValidateGenesis(data GenesisState) error {
@@ -20,17 +21,17 @@ func ValidateGenesis(data GenesisState) error {
 			return fmt.Errorf("Invalid WhoisRecord: Value: %s. Error: Missing Owner", record.Value)
 		}
 		if record.Value == "" {
-			retturn fmt.Errorf("Invalid WhoisRecord: Owner: %s. Error: Missing value", record.Owner)
+			return fmt.Errorf("Invalid WhoisRecord: Owner: %s. Error: Missing value", record.Owner)
 		}
-		if record.Princ == nil {
+		if record.Price == nil {
 			return fmt.Errorf("Invalid WhoisRecord: Value: %s. Error: Missing price", record.Value)
 		}
 	}
 	return nil
 }
 
-func DefaultGenesisStae() GenesisState {
-	return GenesisState {
+func DefaultGenesisState() GenesisState {
+	return GenesisState{
 		WhoisRecords: []Whois{},
 	}
 }
@@ -48,7 +49,7 @@ func ExportGenesis(ctx sdk.Context, k Keeper) GenesisState {
 	for ; iterator.Valid(); iterator.Next() {
 		name := string(iterator.Key())
 		var whois Whois
-		Whois = k.GetWhois(ctx, name)
+		whois = k.GetWhois(ctx, name)
 		records = append(records, whois)
 	}
 	return GenesisState{WhoisRecords: records}

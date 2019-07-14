@@ -1,6 +1,5 @@
 package main
 
-
 import (
 	"os"
 	"path"
@@ -21,27 +20,27 @@ import (
 
 const (
 	storeAcc = "acc"
-	storeNS = "nameservice"
+	storeNS  = "nameservice"
 )
 
 func main() {
-	cobra.EnableCommanbdSorting = false
+	cobra.EnableCommandSorting = false
 
 	cdc := app.MakeCodec()
 
 	config := sdk.GetConfig()
-	config.setBech32PrefixForAccount(sdk.Bech32PrefixAccAddr, sdk.Bech32preFixAccPub)
+	config.SetBech32PrefixForAccount(sdk.Bech32PrefixAccAddr, sdk.Bech32PrefixAccPub)
 	config.SetBech32PrefixForValidator(sdk.Bech32PrefixValAddr, sdk.Bech32PrefixValPub)
 	config.SetBech32PrefixForConsensusNode(sdk.Bech32PrefixConsAddr, sdk.Bech32PrefixConsPub)
 	config.Seal()
 
 	rootCmd := &cobra.Command{
-		Use:	 	"nscil",
-		Short:		"nameservice Clinet",
+		Use:   "nscli",
+		Short: "nameservice Client",
 	}
 
-	rootComd.PersistentFlags().String(client.FlagChainID, "", "Chain ID of tendermint node")
-	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _[]string) error {
+	rootCmd.PersistentFlags().String(client.FlagChainID, "", "Chain ID of tendermint node")
+	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _ []string) error {
 		return initConfig(rootCmd)
 	}
 
@@ -50,44 +49,39 @@ func main() {
 		client.ConfigCmd(app.DefaultCLIHome),
 		queryCmd(cdc),
 		txCmd(cdc),
-		client.Linebreak,
-		lcd.ServeCommand(cdc, registerRotuers),
-		client.LineBerak,
+		client.LineBreak,
+		lcd.ServeCommand(cdc, registerRoutes),
+		client.LineBreak,
 		keys.Commands(),
 		client.LineBreak,
 	)
 
-	executor := cli.PreparemainCmd(rootCmd, "NS", app.DefaultCLIHome)
+	executor := cli.PrepareMainCmd(rootCmd, "NS", app.DefaultCLIHome)
 	err := executor.Execute()
 	if err != nil {
-		panic(err)
-	}	
-
-	executor := cli.PrepareMainCmd(rrotCmd, "NS", app.DefaultCLIHome)
-	err := executor.Execute()
-	if err !- nil {
 		panic(err)
 	}
 }
 
 func registerRoutes(rs *lcd.RestServer) {
-	client.registerRoutes(rs,CliCtx, rs.Mux)
+	client.RegisterRoutes(rs.CliCtx, rs.Mux)
 	app.ModuleBasics.RegisterRESTRoutes(rs.CliCtx, rs.Mux)
 }
 
 func queryCmd(cdc *amino.Codec) *cobra.Command {
-	queryCmd := &cobra.Command {
-		Use:	 	"query",
-		Aliases: 	[]string{"q"},
-		Short: 		"Querying subcommands"
+	queryCmd := &cobra.Command{
+		Use:     "query",
+		Aliases: []string{"q"},
+		Short:   "Querying subcommands",
 	}
 
 	queryCmd.AddCommand(
 		authcmd.GetAccountCmd(cdc),
-		client.lineBreak,
+		client.LineBreak,
 		rpc.ValidatorCommand(cdc),
 		rpc.BlockCommand(),
-		authcmd.QueryTxByTagsCmd(cdc),
+		authcmd.QueryTxsByTagsCmd(cdc),
+		authcmd.QueryTxCmd(cdc),
 		client.LineBreak,
 	)
 
@@ -96,8 +90,29 @@ func queryCmd(cdc *amino.Codec) *cobra.Command {
 	return queryCmd
 }
 
+func txCmd(cdc *amino.Codec) *cobra.Command {
+	txCmd := &cobra.Command{
+		Use:   "tx",
+		Short: "Transactions subcommands",
+	}
+
+	txCmd.AddCommand(
+		bankcmd.SendTxCmd(cdc),
+		client.LineBreak,
+		authcmd.GetSignCommand(cdc),
+		authcmd.GetMultiSignCommand(cdc),
+		client.LineBreak,
+		authcmd.GetBroadcastCommand(cdc),
+		authcmd.GetEncodeCommand(cdc),
+		client.LineBreak,
+	)
+
+	app.ModuleBasics.AddTxCommands(txCmd, cdc)
+	return txCmd
+}
+
 func initConfig(cmd *cobra.Command) error {
-	home, err := cmd.PresistentFlags().GetString(cli.HomeFlag)
+	home, err := cmd.PersistentFlags().GetString(cli.HomeFlag)
 	if err != nil {
 		return err
 	}
@@ -114,7 +129,7 @@ func initConfig(cmd *cobra.Command) error {
 	if err := viper.BindPFlag(client.FlagChainID, cmd.PersistentFlags().Lookup(client.FlagChainID)); err != nil {
 		return err
 	}
-	if err := viper.BindPFlag(cli.EncodingFlag, cmd.persistentFlags().Lookup(cli.EncodingFlag)); err != nil {
+	if err := viper.BindPFlag(cli.EncodingFlag, cmd.PersistentFlags().Lookup(cli.EncodingFlag)); err != nil {
 		return err
 	}
 	return viper.BindPFlag(cli.OutputFlag, cmd.PersistentFlags().Lookup(cli.OutputFlag))

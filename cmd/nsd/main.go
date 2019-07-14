@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/cosmos/cosmos-sdk/server"
-	"github.com/cosmos/cosmos-sdk/x/genaccounts"
-	genaccscli "github.com/cosmos/cosmos-sdk/x/genaccounts/client/cli"
+	"github.com/cosmos/cosmos-sdk/x/auth/genaccounts"
+	genaccscli "github.com/cosmos/cosmos-sdk/x/auth/genaccounts/client/cli"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 
 	"github.com/spf13/cobra"
@@ -23,30 +23,33 @@ import (
 
 func main() {
 	cobra.EnableCommandSorting = false
-	cdc := sdk.GetCongfig()
-	config.SetBech32PrefixForAccount(sdk.Bech32PrefixAccAddr, sdk.Bech32PrefixAccpub)
+
+	cdc := app.MakeCodec()
+
+	config := sdk.GetConfig()
+	config.SetBech32PrefixForAccount(sdk.Bech32PrefixAccAddr, sdk.Bech32PrefixAccPub)
 	config.SetBech32PrefixForValidator(sdk.Bech32PrefixValAddr, sdk.Bech32PrefixValPub)
 	config.SetBech32PrefixForConsensusNode(sdk.Bech32PrefixConsAddr, sdk.Bech32PrefixConsPub)
 	config.Seal()
 
 	ctx := server.NewDefaultContext()
 
-	rootCmd := &cobra.Command {
-		Use:				"nsd",
-		Short:				"nameservice App Daemon (server)",
-		PersistentPreRunE: server.PersistentPreRunEFn(ctx)
+	rootCmd := &cobra.Command{
+		Use:               "nsd",
+		Short:             "nameservice App Daemon (server)",
+		PersistentPreRunE: server.PersistentPreRunEFn(ctx),
 	}
 
-	rootCom.AddCommand(
-		genutilcli.InitCmd(ctx, cdc, app.ModuleBasiscs, app.DafaultNodeHome),
-		genutilcli.CollectGentTxCmd(ctx, cdc, geneaccounts.AppModuleBasic{}, app.DefaultNodeHome),
-		genutilcli.GenTxCmd(ctx, cdc, app.ModuleBasiscs, staking.AppModuleBasic{}, geneaccounts.AppModuleBasic{}, app.DefaultNodeHome, app.DefaultCLIHome),
+	rootCmd.AddCommand(
+		genutilcli.InitCmd(ctx, cdc, app.ModuleBasics, app.DefaultNodeHome),
+		genutilcli.CollectGenTxsCmd(ctx, cdc, genaccounts.AppModuleBasic{}, app.DefaultNodeHome),
+		genutilcli.GenTxCmd(ctx, cdc, app.ModuleBasics, staking.AppModuleBasic{}, genaccounts.AppModuleBasic{}, app.DefaultNodeHome, app.DefaultCLIHome),
 		genutilcli.ValidateGenesisCmd(ctx, cdc, app.ModuleBasics),
 
-		genaccscli.AddGenesisAccountCmd(ctx, cdc, app.DefaultNodeHome, app.DefaultCLIHome),		
+		genaccscli.AddGenesisAccountCmd(ctx, cdc, app.DefaultNodeHome, app.DefaultCLIHome),
 	)
 
-	server.AddCommands(ctx, cdc, rootComd, newApp, exportAppStateAndTMValidators)
+	server.AddCommands(ctx, cdc, rootCmd, newApp, exportAppStateAndTMValidators)
 
 	executor := cli.PrepareBaseCmd(rootCmd, "NS", app.DefaultNodeHome)
 	err := executor.Execute()

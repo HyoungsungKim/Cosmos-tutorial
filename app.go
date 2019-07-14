@@ -4,27 +4,25 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/tendermint/tendermint/libs/log"
-
-	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/types/module"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/genutil"
-	"github.com/cosmos/cosmos-sdk/x/slashing"
-
-	"github.com/cosmos/cosmos-sdk/x/genaccounts"
-
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	distr "github.com/cosmos/cosmos-sdk/x/distribution"
-	"github.com/cosmos/cosmos-sdk/x/params"
-	"github.com/cosmos/cosmos-sdk/x/staking"
-	"github.com/hyoungsungkim/nameservice/x/nameservice"
-
-	bam "github.com/cosmos/cosmos-sdk/baseapp"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	abci "github.com/tendermint/tendermint/abci/types"
 	cmn "github.com/tendermint/tendermint/libs/common"
 	dbm "github.com/tendermint/tendermint/libs/db"
+	"github.com/tendermint/tendermint/libs/log"
+	tmtypes "github.com/tendermint/tendermint/types"
+
+	bam "github.com/cosmos/cosmos-sdk/baseapp"
+	"github.com/cosmos/cosmos-sdk/codec"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/module"
+	"github.com/cosmos/cosmos-sdk/x/auth"
+	"github.com/cosmos/cosmos-sdk/x/auth/genaccounts"
+	"github.com/cosmos/cosmos-sdk/x/bank"
+	distr "github.com/cosmos/cosmos-sdk/x/distribution"
+	"github.com/cosmos/cosmos-sdk/x/genutil"
+	"github.com/cosmos/cosmos-sdk/x/params"
+	"github.com/cosmos/cosmos-sdk/x/slashing"
+	"github.com/cosmos/cosmos-sdk/x/staking"
+	"github.com/hyoungsungkim/nameservice/x/nameservice"
 )
 
 const appName = "nameservice"
@@ -55,23 +53,25 @@ type nameServiceApp struct {
 	keyStaking       *sdk.KVStoreKey
 	tkeyStaking      *sdk.TransientStoreKey
 	keyDistr         *sdk.KVStoreKey
-	tkeyDistr        *sdk.KVStoreKey
+	tkeyDistr        *sdk.TransientStoreKey
+	keyNS            *sdk.KVStoreKey
+	keyParams        *sdk.KVStoreKey
 	tkeyParams       *sdk.TransientStoreKey
 	keySlashing      *sdk.KVStoreKey
 
-	accountKeeper       auth.accountKeeper
-	bankKeepr           bank.accountKeeper
-	stakingKeeper       staking.accountKeeper
-	slashingKeeper      slashing.accountKeeper
+	accountKeeper       auth.AccountKeeper
+	bankKeeper          bank.Keeper
+	stakingKeeper       staking.Keeper
+	slashingKeeper      slashing.Keeper
 	distrKeeper         distr.Keeper
-	feeCollectionKeeper auth.feeCollectionKeeper
+	feeCollectionKeeper auth.FeeCollectionKeeper
 	paramsKeeper        params.Keeper
 	nsKeeper            nameservice.Keeper
 
 	mm *module.Manager
 }
 
-func NewNameServiceApp(longer log.Logger, db dbm.DB) *nameServiceApp {
+func NewNameServiceApp(logger log.Logger, db dbm.DB) *nameServiceApp {
 	cdc := MakeCodec()
 	bApp := bam.NewBaseApp(appName, logger, db, auth.DefaultTxDecoder(cdc))
 
@@ -91,26 +91,26 @@ func NewNameServiceApp(longer log.Logger, db dbm.DB) *nameServiceApp {
 		tkeyParams:       sdk.NewTransientStoreKey(params.TStoreKey),
 		keySlashing:      sdk.NewKVStoreKey(slashing.StoreKey),
 	}
-	app.paramsKeeper = params.NewKeeper(app.cdc, app.keyparams, app.tkeyParams, params.DefaultCodespace)
+	app.paramsKeeper = params.NewKeeper(app.cdc, app.keyParams, app.tkeyParams, params.DefaultCodespace)
 
 	authSubspace := app.paramsKeeper.Subspace(auth.DefaultParamspace)
 	bankSubspace := app.paramsKeeper.Subspace(bank.DefaultParamspace)
 	stakingSubspace := app.paramsKeeper.Subspace(staking.DefaultParamspace)
-	distrsubspace := app.paramsKeeper.Subspace(distr.DefualtParamspace)
+	distrSubspace := app.paramsKeeper.Subspace(distr.DefaultParamspace)
 	slashingSubspace := app.paramsKeeper.Subspace(slashing.DefaultParamspace)
 
-	app.accountKeeper = auth.NewAccountKeeper{
+	app.accountKeeper = auth.NewAccountKeeper(
 		app.cdc,
 		app.keyAccount,
 		authSubspace,
 		auth.ProtoBaseAccount,
-	}
+	)
 
-	app.bankKeeper = bank.NewBaseKeeper{
+	app.bankKeeper = bank.NewBaseKeeper(
 		app.accountKeeper,
-		banksubspace,
+		bankSubspace,
 		bank.DefaultCodespace,
-	}
+	)
 
 	app.feeCollectionKeeper = auth.NewFeeCollectionKeeper(cdc, app.keyFeeCollection)
 
@@ -157,38 +157,38 @@ func NewNameServiceApp(longer log.Logger, db dbm.DB) *nameServiceApp {
 		genaccounts.NewAppModule(app.accountKeeper),
 		genutil.NewAppModule(app.accountKeeper, app.stakingKeeper, app.BaseApp.DeliverTx),
 		auth.NewAppModule(app.accountKeeper, app.feeCollectionKeeper),
-		bank.NewAppModule(app.bankkeeper, app.accoubtKeeper),
-		nameservice.NewAppModule(app, nsKeeper, app.bankKeeper),
+		bank.NewAppModule(app.bankKeeper, app.accountKeeper),
+		nameservice.NewAppModule(app.nsKeeper, app.bankKeeper),
 		distr.NewAppModule(app.distrKeeper),
 		slashing.NewAppModule(app.slashingKeeper, app.stakingKeeper),
 		staking.NewAppModule(app.stakingKeeper, app.feeCollectionKeeper, app.distrKeeper, app.accountKeeper),
 	)
 
-	app.mm.SetOrderBeginBlocker(distr.ModuleName, slashing.ModuleName)
+	app.mm.SetOrderBeginBlockers(distr.ModuleName, slashing.ModuleName)
 	app.mm.SetOrderEndBlockers(staking.ModuleName)
 
-	app.mm.SetOrederInitGenesis(
+	app.mm.SetOrderInitGenesis(
 		genaccounts.ModuleName,
 		distr.ModuleName,
 		staking.ModuleName,
 		auth.ModuleName,
 		bank.ModuleName,
 		slashing.ModuleName,
-		namesrvice.ModleName,
+		nameservice.ModuleName,
 		genutil.ModuleName,
 	)
 
-	app.mm.RegusterRoutes(app.Router(), app.QueryRouter())
+	app.mm.RegisterRoutes(app.Router(), app.QueryRouter())
 
 	app.SetInitChainer(app.InitChainer)
 	app.SetBeginBlocker(app.BeginBlocker)
 	app.SetEndBlocker(app.EndBlocker)
 
-	app.SetAnutHandler(
-		auth.NewAccountHandler(
+	app.SetAnteHandler(
+		auth.NewAnteHandler(
 			app.accountKeeper,
 			app.feeCollectionKeeper,
-			auth.DefaultSigVerifgicationFasConsumer,
+			auth.DefaultSigVerificationGasConsumer,
 		),
 	)
 
@@ -198,14 +198,14 @@ func NewNameServiceApp(longer log.Logger, db dbm.DB) *nameServiceApp {
 		app.keyFeeCollection,
 		app.keyStaking,
 		app.tkeyStaking,
-		app.ketDistr,
+		app.keyDistr,
 		app.tkeyDistr,
 		app.keyNS,
 		app.keyParams,
-		app.tkeyparams,
+		app.tkeyParams,
 	)
 
-	err := app.LoadLatestVersion(app.keymain)
+	err := app.LoadLatestVersion(app.keyMain)
 	if err != nil {
 		cmn.Exit(err.Error())
 	}
@@ -219,10 +219,10 @@ func NewDefaultGenesisState() GenesisState {
 	return ModuleBasics.DefaultGenesis()
 }
 
-func (app *nameServiceApp) InitChainer(ctx sdk.Context, req abci.RequestitChain) abci.ResponseInitChain {
+func (app *nameServiceApp) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.ResponseInitChain {
 	var genesisState GenesisState
 
-	err := app.cdc.UnmarshalJSON(req.AppStateBytes, *genesisState)
+	err := app.cdc.UnmarshalJSON(req.AppStateBytes, &genesisState)
 	if err != nil {
 		panic(err)
 	}
@@ -234,7 +234,7 @@ func (app *nameServiceApp) BeginBlocker(ctx sdk.Context, req abci.RequestBeginBl
 	return app.mm.BeginBlock(ctx, req)
 }
 
-func (app *nameServiceApp) EndBlocker(ctx sdk.Context, req abci.RequestEndBlock) abic.ResponseEndBlock {
+func (app *nameServiceApp) EndBlocker(ctx sdk.Context, req abci.RequestEndBlock) abci.ResponseEndBlock {
 	return app.mm.EndBlock(ctx, req)
 }
 
@@ -243,23 +243,23 @@ func (app *nameServiceApp) LoadHeight(height int64) error {
 }
 
 func (app *nameServiceApp) ExportAppStateAndValidators(forZeorHeight bool, jailWhiteList []string,
-) (appState json.RawMessage, validators []tmtypes.GenesisVaildator, err Error) {
-	ctx := app.NewContext9true, abci.Header{height: app.LastBlockHeight()}
+) (appState json.RawMessage, validators []tmtypes.GenesisValidator, err error) {
+	ctx := app.NewContext(true, abci.Header{Height: app.LastBlockHeight()})
 
-	gentState := app.mm.ExportGenesis(ctx)
-	appState, err = codec.marshallJSONIndent(app.cdc, genState)
+	genState := app.mm.ExportGenesis(ctx)
+	appState, err = codec.MarshalJSONIndent(app.cdc, genState)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	validators = staking.Writevalidators(ctx, app.stakingKeeper)
+	validators = staking.WriteValidators(ctx, app.stakingKeeper)
 
 	return appState, validators, nil
 }
 
-func MarkCodec() *codec.Codec {
+func MakeCodec() *codec.Codec {
 	var cdc = codec.New()
-	Modulebasics.RegisterCodec(cdc)
+	ModuleBasics.RegisterCodec(cdc)
 	sdk.RegisterCodec(cdc)
 	codec.RegisterCrypto(cdc)
 	return cdc

@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/cosmos/cosmos-sdk/client/context"
+	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	"github.com/hyoungsungkim/nameservice/x/nameservice/types"
 
-	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
 
@@ -18,15 +18,15 @@ const (
 	restName = "name"
 )
 
-func RegisterRoute(cliCtx contect.CLIContext, r *mux.Router, dcd *codec.Codec, storeName string) {
-	r.HandleFunc(fmt.Sprintf("/%s/names", storeName), nameHandler(cdc, cliCtx, storeName)).Methods("GET")
-	r.HandleFunc(fmt.Sprintf("/%s/names", storeName), buyNameHandler(cdc, cliCtx)).Methods("POST")
-	r.HandleFunc(fmt.Sprintf("/%s/names", storeName), setNameHandler(cdc, cliCtx)).Methods("PUT")
-	r.HandleFunc(fmt.Sprintf("/%s/names/{%s}", storeName, restName), resolveNameHandler(cdc, cliCtx, storeName)).Method("GET")
-	r.HandleFunc(fmt.Sprintf("/%s/names/{%s}/whois", storeName, restName), whoIsHandler(cdc, cliCtx, storeName)).Method("GET")
+func RegisterRoute(cliCtx context.CLIContext, r *mux.Router, storeName string) {
+	r.HandleFunc(fmt.Sprintf("/%s/names", storeName), namesHandler(cliCtx, storeName)).Methods("GET")
+	r.HandleFunc(fmt.Sprintf("/%s/names", storeName), buyNameHandler(cliCtx)).Methods("POST")
+	r.HandleFunc(fmt.Sprintf("/%s/names", storeName), setNameHandler(cliCtx)).Methods("PUT")
+	r.HandleFunc(fmt.Sprintf("/%s/names/{%s}", storeName, restName), resolveNameHandler(cliCtx, storeName)).Methods("GET")
+	r.HandleFunc(fmt.Sprintf("/%s/names/{%s}/whois", storeName, restName), whoIsHandler(cliCtx, storeName)).Methods("GET")
 }
 
-func resolveNameHandler(cliCtx contect.CLIContext, storeName string) http.HandlerFunc {
+func resolveNameHandler(cliCtx context.CLIContext, storeName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		paramType := vars[restName]
@@ -43,7 +43,7 @@ func resolveNameHandler(cliCtx contect.CLIContext, storeName string) http.Handle
 
 func whoIsHandler(cliCtx context.CLIContext, storeName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(v)
+		vars := mux.Vars(r)
 		paramType := vars[restName]
 
 		res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/whois/%s", storeName, paramType), nil)
@@ -52,7 +52,7 @@ func whoIsHandler(cliCtx context.CLIContext, storeName string) http.HandlerFunc 
 			return
 		}
 
-		rest.PostProcessResponse(w. cliCtx, res)
+		rest.PostProcessResponse(w, cliCtx, res)
 	}
 }
 
@@ -63,24 +63,31 @@ func namesHandler(cliCtx context.CLIContext, storeName string) http.HandlerFunc 
 			rest.WriteErrorResponse(w, http.StatusNotFound, err.Error())
 			return
 		}
+		rest.PostProcessResponse(w, cliCtx, res)
 	}
-	rest.PostProcessResponse(w, cliCtx, res)
 }
 
-type buyNameReq(cliCtx context.CLIContext) http.HandleFunc {
+type buyNameReq struct {
+	BaseReq rest.BaseReq `json:"Base-req"`
+	Name    string       `json:"name"`
+	Amount  string       `json:"amount"`
+	Buyer   string       `json:"buyer"`
+}
+
+func buyNameHandler(cliCtx context.CLIContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req buyNameReq
-		if !rest.ReadREstReq(w, r, cliCtx.COdec, &req) {
+		if !rest.ReadRESTReq(w, r, cliCtx.Codec, &req) {
 			rest.WriteErrorResponse(w, http.StatusBadRequest, "failed to parse request")
 			return
 		}
 
 		baseReq := req.BaseReq.Sanitize()
-		if !baseReq.ValidateBaic(w) {
+		if !baseReq.ValidateBasic(w) {
 			return
 		}
 
-		addr, err := sdk.AccAddressFromBech32(req.Buyer) 
+		addr, err := sdk.AccAddressFromBech32(req.Buyer)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
@@ -104,10 +111,10 @@ type buyNameReq(cliCtx context.CLIContext) http.HandleFunc {
 }
 
 type setNameReq struct {
-	BaseReq rest.BaseReq	'json:"base_req"'
-	Name 	string			'json:"name"'		
-	Value 	string			'json:"value"'
-	Owner 	string			'json:"owner"'
+	BaseReq rest.BaseReq `json:"base_req"`
+	Name    string       `json:"name"`
+	Value   string       `json:"value"`
+	Owner   string       `json:"owner"`
 }
 
 func setNameHandler(cliCtx context.CLIContext) http.HandlerFunc {
@@ -123,19 +130,19 @@ func setNameHandler(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		addr, err := sdk.AccAddressFromBech32(req.Owner) 
+		addr, err := sdk.AccAddressFromBech32(req.Owner)
 		if err != nil {
 			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
 		}
 
-		msg := types.NewMsgSetName(req.name, req.Value, addr)
+		msg := types.NewMsgSetName(req.Name, req.Value, addr)
 		err = msg.ValidateBasic()
 		if err != nil {
-			rest.WriteErrorresponse(w, http.StatusBadRequest, err.Error())
+			rest.WriteErrorResponse(w, http.StatusBadRequest, err.Error())
 			return
 		}
 
-		utils.WriteGenerateStdTxResponse(w, cliCtx, baseReq, []sdl.Msg{msg})
+		utils.WriteGenerateStdTxResponse(w, cliCtx, baseReq, []sdk.Msg{msg})
 	}
 }
